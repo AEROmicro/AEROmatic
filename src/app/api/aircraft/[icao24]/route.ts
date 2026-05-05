@@ -39,7 +39,7 @@ export async function GET(
       if (adsbAc) {
         const altBaroRaw = adsbAc.alt_baro;
         state = {
-          icao24: (adsbAc.hex as string | undefined) ?? icao24,
+          icao24: (adsbAc.hex as string | null | undefined) ?? icao24,
           callsign: ((adsbAc.flight as string) ?? "").trim(),
           origin_country: "",
           time_position: adsbAc.seen_pos != null
@@ -123,7 +123,7 @@ export async function GET(
     // adsb.fi `r` = registration, `t` = ICAO type code (e.g. "B738").
     // Both `model` and `typecode` are set to `t` because adsb.fi only provides
     // the short type code; a richer model string is not available at this tier.
-    if (!meta && adsbAc && (adsbAc.r || adsbAc.t)) {
+    if (!meta && adsbAc && (adsbAc.r != null || adsbAc.t != null)) {
       const reg = adsbAc.r != null ? (adsbAc.r as string) : null;
       const typeCode = adsbAc.t != null ? (adsbAc.t as string) : null;
       meta = {
