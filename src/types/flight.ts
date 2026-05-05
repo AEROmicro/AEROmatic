@@ -36,11 +36,16 @@ export interface InstrumentValues {
   altitude_ft: number;     // feet
   vsi_fpm: number;         // ft/min
   heading_deg: number;     // 0-359°
-  pitch_deg: number;       // estimated
-  bank_deg: number;        // estimated
+  pitch_deg: number;       // estimated degrees
+  bank_deg: number;        // estimated degrees
+  slip: number;            // slip/skid -1..+1
   n1_pct: number;          // engine N1 % (simulated)
+  n2_pct: number;          // engine N2 % (simulated)
   egt_c: number;           // EGT °C (simulated)
-  fuel_lbs: number;        // fuel lbs (simulated)
+  fuel_lbs: number;        // fuel % (simulated, 0-100)
   flap_pos: number;        // 0-40 degrees (simulated)
   oat_c: number;           // outside air temp °C (estimated)
+  mach: number;            // Mach number (derived)
+  aoa_deg: number;         // angle of attack degrees (estimated)
+  g_force: number;         // G load (estimated)
 }
