@@ -1,19 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { OPENSKY_BASE, openskyHeaders } from "@/lib/opensky";
 
 export const runtime = 'edge';
 
 const OPENSKY_META = "https://opensky-network.org/api/metadata/aircraft/registration";
-const OPENSKY_STATES = "https://opensky-network.org/api/states/all";
-
-function openskyHeaders(): HeadersInit {
-  const user = process.env.OPENSKY_USERNAME;
-  const pass = process.env.OPENSKY_PASSWORD;
-  const headers: Record<string, string> = { Accept: "application/json" };
-  if (user && pass) {
-    headers["Authorization"] = "Basic " + btoa(`${user}:${pass}`);
-  }
-  return headers;
-}
 
 export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams.get("q")?.trim().toUpperCase();
@@ -37,7 +27,7 @@ export async function GET(req: NextRequest) {
 
     // Fallback: search all live states by callsign
     const statesRes = await fetch(
-      OPENSKY_STATES,
+      `${OPENSKY_BASE}/states/all`,
       { next: { revalidate: 10 }, headers: openskyHeaders() }
     );
 

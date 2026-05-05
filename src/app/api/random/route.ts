@@ -1,24 +1,13 @@
 import { NextResponse } from "next/server";
+import { OPENSKY_BASE, openskyHeaders } from "@/lib/opensky";
 
 export const runtime = 'edge';
-
-const OPENSKY_STATES = "https://opensky-network.org/api/states/all";
-
-function openskyHeaders(): HeadersInit {
-  const user = process.env.OPENSKY_USERNAME;
-  const pass = process.env.OPENSKY_PASSWORD;
-  const headers: Record<string, string> = { Accept: "application/json" };
-  if (user && pass) {
-    headers["Authorization"] = "Basic " + btoa(`${user}:${pass}`);
-  }
-  return headers;
-}
 
 export async function GET() {
   try {
     // Fetch aircraft in a mid-Atlantic / Europe bounding box for high traffic density
     const res = await fetch(
-      `${OPENSKY_STATES}?lamin=30&lomin=-30&lamax=60&lomax=40`,
+      `${OPENSKY_BASE}/states/all?lamin=30&lomin=-30&lamax=60&lomax=40`,
       { next: { revalidate: 10 }, headers: openskyHeaders() }
     );
 

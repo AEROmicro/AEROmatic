@@ -1,19 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { OPENSKY_BASE, openskyHeaders } from "@/lib/opensky";
 
 export const runtime = 'edge';
 
-const OPENSKY_BASE = "https://opensky-network.org/api";
 const META_BASE = "https://opensky-network.org/api/metadata/aircraft/icao";
-
-function openskyHeaders(): HeadersInit {
-  const user = process.env.OPENSKY_USERNAME;
-  const pass = process.env.OPENSKY_PASSWORD;
-  const headers: Record<string, string> = { Accept: "application/json" };
-  if (user && pass) {
-    headers["Authorization"] = "Basic " + btoa(`${user}:${pass}`);
-  }
-  return headers;
-}
 
 export async function GET(
   _req: NextRequest,
