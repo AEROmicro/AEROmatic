@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { OPENSKY_BASE, openskyHeaders } from "@/lib/opensky";
+import { ADSB_BASE, HEXDB_BASE } from "@/lib/adsb";
 
 export const runtime = 'edge';
-
-const META_BASE = "https://opensky-network.org/api/metadata/aircraft/icao";
 
 export async function GET(
   _req: NextRequest,
@@ -12,60 +10,72 @@ export async function GET(
   const icao24 = (await params).icao24.toLowerCase();
 
   try {
-    const [stateRes, metaRes] = await Promise.allSettled([
-      fetch(`${OPENSKY_BASE}/states/all?icao24=${icao24}`, {
-        next: { revalidate: 10 },
-        headers: openskyHeaders(),
-      }),
-      fetch(`${META_BASE}/${icao24}`, {
-        next: { revalidate: 3600 },
-        headers: openskyHeaders(),
-      }),
+    const [adsbRes, hexRes] = await Promise.allSettled([
+      fetch(`${ADSB_BASE}/icao/${icao24}`, { next: { revalidate: 10 } }),
+      fetch(`${HEXDB_BASE}/aircraft/${icao24}`, { next: { revalidate: 3600 } }),
     ]);
 
+    // ── Live state from adsb.fi ──────────────────────────────────────────────
+    // adsb.fi units: gs=knots, alt_baro/alt_geom=feet, baro_rate=ft/min
+    // AircraftState interface expects: velocity=m/s, altitudes=metres, vertical_rate=m/s
+    let adsbAc: Record<string, unknown> | null = null;
     let state = null;
-    if (stateRes.status === "fulfilled") {
-      if (stateRes.value.status === 429) {
-        return NextResponse.json(
-          { error: "OpenSky API rate limit reached. Please wait and try again." },
-          { status: 429 }
-        );
-      }
-      if (stateRes.value.ok) {
-        const json = await stateRes.value.json();
-        if (json.states && json.states.length > 0) {
-          const s = json.states[0];
-          state = {
-            icao24: s[0],
-            callsign: (s[1] ?? "").trim(),
-            origin_country: s[2] ?? "",
-            time_position: s[3],
-            last_contact: s[4],
-            longitude: s[5],
-            latitude: s[6],
-            baro_altitude: s[7],
-            on_ground: s[8],
-            velocity: s[9],
-            true_track: s[10],
-            vertical_rate: s[11],
-            geo_altitude: s[13],
-            squawk: s[14],
-          };
-        }
+    if (adsbRes.status === "fulfilled" && adsbRes.value.ok) {
+      const json = await adsbRes.value.json();
+      adsbAc = (json.ac as Record<string, unknown>[])?.[0] ?? null;
+      if (adsbAc) {
+        const altBaroRaw = adsbAc.alt_baro;
+        const onGround = altBaroRaw === "ground";
+        state = {
+          icao24: (adsbAc.hex as string) ?? icao24,
+          callsign: ((adsbAc.flight as string) ?? "").trim(),
+          origin_country: "",
+          time_position: adsbAc.seen_pos != null
+            ? Math.floor(Date.now() / 1000) - (adsbAc.seen_pos as number)
+            : null,
+          last_contact: adsbAc.seen != null
+            ? Math.floor(Date.now() / 1000) - (adsbAc.seen as number)
+            : Math.floor(Date.now() / 1000),
+          longitude: (adsbAc.lon as number) ?? null,
+          latitude: (adsbAc.lat as number) ?? null,
+          baro_altitude: typeof altBaroRaw === "number" ? altBaroRaw * 0.3048 : null,
+          on_ground: onGround,
+          velocity: adsbAc.gs != null ? (adsbAc.gs as number) * 0.514444 : null,
+          true_track: (adsbAc.track as number) ?? null,
+          vertical_rate: adsbAc.baro_rate != null ? (adsbAc.baro_rate as number) * 0.00508 : null,
+          geo_altitude: adsbAc.alt_geom != null ? (adsbAc.alt_geom as number) * 0.3048 : null,
+          squawk: (adsbAc.squawk as string) ?? null,
+        };
       }
     }
 
+    // ── Metadata from hexdb.io ───────────────────────────────────────────────
     let meta = null;
-    if (metaRes.status === "fulfilled" && metaRes.value.ok) {
-      const m = await metaRes.value.json();
+    if (hexRes.status === "fulfilled" && hexRes.value.ok) {
+      const m = await hexRes.value.json() as Record<string, string>;
+      if (m && (m.Registration || m.Manufacturer || m.Type)) {
+        meta = {
+          icao24,
+          registration: m.Registration ?? null,
+          manufacturerName: m.Manufacturer ?? null,
+          model: m.Type ?? null,
+          typecode: m.ICAOTypeCode ?? null,
+          operator: m.RegisteredOwners ?? null,
+          owner: m.RegisteredOwners ?? null,
+        };
+      }
+    }
+
+    // Fall back to inline registration/type from adsb.fi if hexdb had nothing
+    if (!meta && adsbAc && (adsbAc.r || adsbAc.t)) {
       meta = {
-        icao24: m.icao24 ?? icao24,
-        registration: m.registration ?? null,
-        manufacturerName: m.manufacturerName ?? null,
-        model: m.model ?? null,
-        typecode: m.typecode ?? null,
-        operator: m.operatorCallsign ?? m.operator ?? null,
-        owner: m.owner ?? null,
+        icao24,
+        registration: (adsbAc.r as string) ?? null,
+        manufacturerName: null,
+        model: (adsbAc.t as string) ?? null,
+        typecode: (adsbAc.t as string) ?? null,
+        operator: null,
+        owner: null,
       };
     }
 
