@@ -12,6 +12,9 @@ export function openskyHeaders(): HeadersInit {
   const pass = process.env.OPENSKY_PASSWORD;
   const headers: Record<string, string> = { Accept: "application/json" };
   if (user && pass) {
+    if (user.includes(":")) {
+      throw new Error("OPENSKY_USERNAME must not contain a colon character");
+    }
     const encoded =
       typeof Buffer !== "undefined"
         ? Buffer.from(`${user}:${pass}`).toString("base64")

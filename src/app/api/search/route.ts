@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
     if (statesRes.status === 401 || statesRes.status === 403) {
       return NextResponse.json(
         { error: "OpenSky API requires credentials. Set OPENSKY_USERNAME and OPENSKY_PASSWORD." },
-        { status: 502 }
+        { status: 503 }
       );
     }
 
