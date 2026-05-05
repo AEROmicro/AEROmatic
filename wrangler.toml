@@ -1,0 +1,7 @@
+#:schema node_modules/wrangler/config-schema.json
+name = "aerodeck"
+compatibility_date = "2024-09-23"
+compatibility_flags = [ "nodejs_compat" ]
+
+# This tells Cloudflare where your Next.js build output is
+pages_build_output_dir = ".vercel/output/static"
