@@ -16,7 +16,7 @@ const geistMono = localFont({
 export const metadata: Metadata = {
   title: "AEROmatic FIDS — Flight Information Display System",
   description:
-    "Live cockpit instruments, flight data, METAR weather and real-time aircraft tracking powered by OpenSky Network.",
+    "Live cockpit instruments, flight data, METAR weather and real-time aircraft tracking powered by adsb.fi and OpenSky Network.",
 };
 
 export default function RootLayout({
