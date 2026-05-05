@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+export const runtime = 'edge';
+
 const OPENSKY_STATES = "https://opensky-network.org/api/states/all";
 
 export async function GET() {
