@@ -7,9 +7,9 @@ const META_BASE = "https://opensky-network.org/api/metadata/aircraft/icao";
 
 export async function GET(
   _req: NextRequest,
-  { params }: { params: { icao24: string } }
+  { params }: { params: Promise<{ icao24: string }> }
 ) {
-  const icao24 = params.icao24.toLowerCase();
+  const icao24 = (await params).icao24.toLowerCase();
 
   try {
     const [stateRes, metaRes] = await Promise.allSettled([
