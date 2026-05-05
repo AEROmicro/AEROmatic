@@ -5,6 +5,16 @@ export const runtime = 'edge';
 const OPENSKY_BASE = "https://opensky-network.org/api";
 const META_BASE = "https://opensky-network.org/api/metadata/aircraft/icao";
 
+function openskyHeaders(): HeadersInit {
+  const user = process.env.OPENSKY_USERNAME;
+  const pass = process.env.OPENSKY_PASSWORD;
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (user && pass) {
+    headers["Authorization"] = "Basic " + btoa(`${user}:${pass}`);
+  }
+  return headers;
+}
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: { icao24: string } }
@@ -15,35 +25,43 @@ export async function GET(
     const [stateRes, metaRes] = await Promise.allSettled([
       fetch(`${OPENSKY_BASE}/states/all?icao24=${icao24}`, {
         next: { revalidate: 10 },
-        headers: { "Accept": "application/json" },
+        headers: openskyHeaders(),
       }),
       fetch(`${META_BASE}/${icao24}`, {
         next: { revalidate: 3600 },
-        headers: { "Accept": "application/json" },
+        headers: openskyHeaders(),
       }),
     ]);
 
     let state = null;
-    if (stateRes.status === "fulfilled" && stateRes.value.ok) {
-      const json = await stateRes.value.json();
-      if (json.states && json.states.length > 0) {
-        const s = json.states[0];
-        state = {
-          icao24: s[0],
-          callsign: (s[1] ?? "").trim(),
-          origin_country: s[2] ?? "",
-          time_position: s[3],
-          last_contact: s[4],
-          longitude: s[5],
-          latitude: s[6],
-          baro_altitude: s[7],
-          on_ground: s[8],
-          velocity: s[9],
-          true_track: s[10],
-          vertical_rate: s[11],
-          geo_altitude: s[13],
-          squawk: s[14],
-        };
+    if (stateRes.status === "fulfilled") {
+      if (stateRes.value.status === 429) {
+        return NextResponse.json(
+          { error: "OpenSky API rate limit reached. Please wait and try again." },
+          { status: 429 }
+        );
+      }
+      if (stateRes.value.ok) {
+        const json = await stateRes.value.json();
+        if (json.states && json.states.length > 0) {
+          const s = json.states[0];
+          state = {
+            icao24: s[0],
+            callsign: (s[1] ?? "").trim(),
+            origin_country: s[2] ?? "",
+            time_position: s[3],
+            last_contact: s[4],
+            longitude: s[5],
+            latitude: s[6],
+            baro_altitude: s[7],
+            on_ground: s[8],
+            velocity: s[9],
+            true_track: s[10],
+            vertical_rate: s[11],
+            geo_altitude: s[13],
+            squawk: s[14],
+          };
+        }
       }
     }
 
