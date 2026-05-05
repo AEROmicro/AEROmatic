@@ -1,16 +1,29 @@
 import { NextResponse } from "next/server";
+import { OPENSKY_BASE, openskyHeaders } from "@/lib/opensky";
 
 export const runtime = 'edge';
-
-const OPENSKY_STATES = "https://opensky-network.org/api/states/all";
 
 export async function GET() {
   try {
     // Fetch aircraft in a mid-Atlantic / Europe bounding box for high traffic density
     const res = await fetch(
-      `${OPENSKY_STATES}?lamin=30&lomin=-30&lamax=60&lomax=40`,
-      { next: { revalidate: 10 }, headers: { "Accept": "application/json" } }
+      `${OPENSKY_BASE}/states/all?lamin=30&lomin=-30&lamax=60&lomax=40`,
+      { next: { revalidate: 10 }, headers: openskyHeaders() }
     );
+
+    if (res.status === 401 || res.status === 403) {
+      return NextResponse.json(
+        { error: "OpenSky API requires credentials. Set OPENSKY_USERNAME and OPENSKY_PASSWORD." },
+        { status: 503 }
+      );
+    }
+
+    if (res.status === 429) {
+      return NextResponse.json(
+        { error: "OpenSky API rate limit reached. Please wait and try again." },
+        { status: 429 }
+      );
+    }
 
     if (!res.ok) {
       throw new Error(`OpenSky returned ${res.status}`);

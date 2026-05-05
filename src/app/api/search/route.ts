@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { OPENSKY_BASE, openskyHeaders } from "@/lib/opensky";
 
 export const runtime = 'edge';
 
 const OPENSKY_META = "https://opensky-network.org/api/metadata/aircraft/registration";
-const OPENSKY_STATES = "https://opensky-network.org/api/states/all";
 
 export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams.get("q")?.trim().toUpperCase();
@@ -12,10 +12,10 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // Try treating query as registration first
+    // Try treating query as registration first (requires OpenSky credentials)
     const metaRes = await fetch(`${OPENSKY_META}/${encodeURIComponent(q)}`, {
       next: { revalidate: 3600 },
-      headers: { "Accept": "application/json" },
+      headers: openskyHeaders(),
     });
 
     if (metaRes.ok) {
@@ -25,11 +25,25 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Fallback: search by callsign - fetch a region and filter
+    // Fallback: search all live states by callsign
     const statesRes = await fetch(
-      `${OPENSKY_STATES}/all`,
-      { next: { revalidate: 10 }, headers: { "Accept": "application/json" } }
+      `${OPENSKY_BASE}/states/all`,
+      { next: { revalidate: 10 }, headers: openskyHeaders() }
     );
+
+    if (statesRes.status === 401 || statesRes.status === 403) {
+      return NextResponse.json(
+        { error: "OpenSky API requires credentials. Set OPENSKY_USERNAME and OPENSKY_PASSWORD." },
+        { status: 503 }
+      );
+    }
+
+    if (statesRes.status === 429) {
+      return NextResponse.json(
+        { error: "OpenSky API rate limit reached. Please wait and try again." },
+        { status: 429 }
+      );
+    }
 
     if (statesRes.ok) {
       const data = await statesRes.json();
