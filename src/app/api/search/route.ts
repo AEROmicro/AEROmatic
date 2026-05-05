@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { OPENSKY_BASE, openskyHeaders } from "@/lib/opensky";
+import { ADSB_BASE } from "@/lib/adsb";
+import { openskyHeaders } from "@/lib/opensky";
 
 export const runtime = 'edge';
 
-const OPENSKY_META = "https://opensky-network.org/api/metadata/aircraft/registration";
+const OS_META_BASE = "https://opensky-network.org/api/metadata/aircraft/registration";
 
 export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams.get("q")?.trim().toUpperCase();
@@ -12,52 +13,55 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // Try treating query as registration first (requires OpenSky credentials)
-    const metaRes = await fetch(`${OPENSKY_META}/${encodeURIComponent(q)}`, {
-      next: { revalidate: 3600 },
-      headers: openskyHeaders(),
-    });
+    // Fire adsb.fi (registration + callsign) and OpenSky registration simultaneously
+    const [adsbRegRes, adsbCallsignRes, osRegRes] = await Promise.allSettled([
+      fetch(`${ADSB_BASE}/registration/${encodeURIComponent(q)}`, { next: { revalidate: 30 } }),
+      fetch(`${ADSB_BASE}/callsign/${encodeURIComponent(q)}`, { next: { revalidate: 10 } }),
+      fetch(`${OS_META_BASE}/${encodeURIComponent(q)}`, {
+        next: { revalidate: 3600 },
+        headers: openskyHeaders(),
+      }),
+    ]);
 
-    if (metaRes.ok) {
-      const meta = await metaRes.json();
+    // adsb.fi registration match (primary)
+    if (adsbRegRes.status === "fulfilled" && adsbRegRes.value.ok) {
+      const data = await adsbRegRes.value.json() as { ac?: Record<string, unknown>[] };
+      const ac = data.ac?.[0];
+      if (ac?.hex) {
+        return NextResponse.json({
+          icao24: (ac.hex as string).toLowerCase(),
+          registration: (ac.r as string) ?? q,
+        });
+      }
+    }
+
+    // adsb.fi callsign match (primary)
+    if (adsbCallsignRes.status === "fulfilled" && adsbCallsignRes.value.ok) {
+      const data = await adsbCallsignRes.value.json() as { ac?: Record<string, unknown>[] };
+      const ac = data.ac?.[0];
+      if (ac?.hex) {
+        return NextResponse.json({
+          icao24: (ac.hex as string).toLowerCase(),
+          callsign: ((ac.flight as string) ?? q).trim(),
+        });
+      }
+    }
+
+    // OpenSky registration fallback
+    if (osRegRes.status === "fulfilled" && osRegRes.value.ok) {
+      const meta = await osRegRes.value.json() as Record<string, string>;
       if (meta.icao24) {
-        return NextResponse.json({ icao24: meta.icao24.toLowerCase(), registration: meta.registration });
+        return NextResponse.json({
+          icao24: meta.icao24.toLowerCase(),
+          registration: meta.registration ?? q,
+        });
       }
     }
 
-    // Fallback: search all live states by callsign
-    const statesRes = await fetch(
-      `${OPENSKY_BASE}/states/all`,
-      { next: { revalidate: 10 }, headers: openskyHeaders() }
+    return NextResponse.json(
+      { error: "No aircraft found matching that registration or callsign" },
+      { status: 404 }
     );
-
-    if (statesRes.status === 401 || statesRes.status === 403) {
-      return NextResponse.json(
-        { error: "OpenSky API requires credentials. Set OPENSKY_USERNAME and OPENSKY_PASSWORD." },
-        { status: 503 }
-      );
-    }
-
-    if (statesRes.status === 429) {
-      return NextResponse.json(
-        { error: "OpenSky API rate limit reached. Please wait and try again." },
-        { status: 429 }
-      );
-    }
-
-    if (statesRes.ok) {
-      const data = await statesRes.json();
-      if (data.states) {
-        const match = data.states.find(
-          (s: unknown[]) => typeof s[1] === "string" && s[1].trim().toUpperCase() === q
-        );
-        if (match) {
-          return NextResponse.json({ icao24: (match[0] as string).toLowerCase(), callsign: (match[1] as string).trim() });
-        }
-      }
-    }
-
-    return NextResponse.json({ error: "No aircraft found matching that registration or callsign" }, { status: 404 });
   } catch (err) {
     console.error("Search API error:", err);
     return NextResponse.json({ error: "Search failed" }, { status: 500 });
