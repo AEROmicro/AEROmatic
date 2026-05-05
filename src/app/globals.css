@@ -1,0 +1,36 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #000000;
+  --foreground: #ffffff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Instrument glow in dark contexts */
+.instrument-glow {
+  filter: drop-shadow(0 0 6px rgba(0, 255, 136, 0.15));
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
