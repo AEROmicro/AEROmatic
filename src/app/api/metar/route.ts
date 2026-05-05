@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
+export const runtime = 'edge';
+
 const AWC_BASE = "https://aviationweather.gov/api/data/metar";
 
 export async function GET(req: NextRequest) {

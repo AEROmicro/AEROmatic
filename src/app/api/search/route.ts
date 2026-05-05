@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
+export const runtime = 'edge';
+
 const OPENSKY_META = "https://opensky-network.org/api/metadata/aircraft/registration";
 const OPENSKY_STATES = "https://opensky-network.org/api/states/all";
 

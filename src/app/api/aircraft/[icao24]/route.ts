@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
+export const runtime = 'edge';
+
 const OPENSKY_BASE = "https://opensky-network.org/api";
 const META_BASE = "https://opensky-network.org/api/metadata/aircraft/icao";
 
